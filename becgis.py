@@ -8,12 +8,13 @@ import os
 import datetime
 import calendar
 import collections
+import subprocess
+import csv
 import LatLon
 from osgeo import gdal, osr
 from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
 import numpy as np
-
 
 def mm_to_km3(lu_fih, var_fihs):
     """
@@ -748,7 +749,7 @@ def map_pixel_area_km(fih, approximate_lengths=False):
     xsize, ysize, geot = get_geoinfo(fih)[2:-1]
     area_column = np.zeros((ysize, 1))
     for y_pixel in range(ysize):
-        pnt1 = LatLon.LatLon(geot[3] + y_pixel*geot[1], geot[0])
+        pnt1 = LatLon.LatLon(geot[3] + y_pixel * geot[5], geot[0])
         pnt2 = LatLon.LatLon(float(str(pnt1.lat)), float(str(pnt1.lon)) + geot[1])
         pnt3 = LatLon.LatLon(float(str(pnt1.lat)) - geot[1], float(str(pnt1.lon)))
         pnt4 = LatLon.LatLon(float(str(pnt1.lat)) - geot[1], float(str(pnt1.lon)) + geot[1])
@@ -843,6 +844,78 @@ def xdaily_to_monthly(files, dates, out_path, name_out):
         create_geotiff(out_fih, monthly, *geo_info, compress="LZW")
 
         print "{0} {1} Created".format(yyyy, month)
+
+
+def convert_to_tif(z, lat, lon, output_fh, gdal_grid_path=r'C:\Program Files\QGIS 2.18\bin\gdal_grid.exe'):
+    """
+    Create a geotiff with WGS84 projection from three arrays specifying (x,y,z)
+    values.
+
+    Parameters
+    ----------
+    z : ndarray
+        Array containing the z-values.
+    lat : ndarray
+        Array containing the latitudes (in decimal degrees) corresponding to
+        the z-values.
+    lon : ndarray
+        Array containing the latitudes (in decimal degrees) corresponding to
+        the z-values.
+    output_fh : str
+        String defining the location for the output file.
+    gdal_grid_path : str
+        Path to the gdal_grid executable.
+    """
+    folder, filen = os.path.split(output_fh)
+
+    if not os.path.exists(folder):
+        os.chdir(folder)
+
+    if np.all([lat.ndim == 2, lon.ndim == 2, z.ndim == 2]):
+        csv_path = os.path.join(folder, 'temp.csv')
+        with open(csv_path, 'wb') as csvfile:
+            spamwriter = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+            spamwriter.writerow(['Easting', 'Northing', 'z'])
+            for xindex in range(np.shape(lat)[0]):
+                for yindex in range(np.shape(lat)[1]):
+                    spamwriter.writerow([lon[xindex, yindex], lat[xindex, yindex], z[xindex, yindex]])
+
+    elif np.all([lat.ndim == 1, lon.ndim == 1, z.ndim == 1]):
+        csv_path = os.path.join(folder, 'temp.csv')
+        with open(csv_path, 'wb') as csvfile:
+            spamwriter = csv.writer(csvfile, delimiter=',', quoting=csv.QUOTE_MINIMAL)
+            spamwriter.writerow(['Easting', 'Northing', 'z'])
+            for xindex in range(np.shape(lat)[0]):
+                spamwriter.writerow([lon[xindex], lat[xindex], z[xindex]])
+
+    else:
+        raise ValueError("convert_to_tif is not compatible with the given \
+                         dimensions of z, lat and lon.")
+
+    vrt_path = os.path.join(folder, 'temp.vrt')
+    with open(vrt_path, "w") as filen:
+        filen.write('<OGRVRTDataSource>')
+        filen.write('\n\t<OGRVRTLayer name="temp">')
+        filen.write('\n\t\t<SrcDataSource>{0}</SrcDataSource>'.format(csv_path))
+        filen.write('\n\t\t<GeometryType>wkbPoint</GeometryType>')
+        filen.write('\n\t\t<GeometryField encoding="PointFromColumns" x="Easting" y="Northing" z="z"/>')
+        filen.write('\n\t</OGRVRTLayer>')
+        filen.write('\n</OGRVRTDataSource>')
+
+    string = [gdal_grid_path,
+              '-a_srs "+proj=longlat +datum=WGS84 +no_defs "',
+              '-of GTiff',
+              '-l temp',
+              '-a linear:radius={0}:nodata=-9999'.format(np.max([np.max(np.diff(lon)), np.max(np.diff(lat))])),
+              vrt_path,
+              output_fh]
+
+    proc = subprocess.Popen(' '.join(string), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    out, err = proc.communicate()
+    print out, err
+
+    os.remove(csv_path)
+    os.remove(vrt_path)
 
 
 def assert_same_keys(list_of_dictionaries):
