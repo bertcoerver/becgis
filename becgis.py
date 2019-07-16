@@ -142,7 +142,7 @@ def get_gdalwarp_info(fih, subdataset=0):
     if not srs:
         srs = osr.SpatialReference()
         srs.ImportFromEPSG(4326).ExportToPrettyWkt()
-        print "srs not defined, using EPSG4326."
+        print("srs not defined, using EPSG4326.")
     xsize = dataset.RasterXSize
     ysize = dataset.RasterYSize
     res = ' '.join([str(xsize), str(ysize)])
@@ -289,9 +289,10 @@ def masked_moving_average(date, fihs, dates, lu_fih, moving_avg_length,
     AVG : ndarray
         Array with the averaged values.
     """
+    # https://stackoverflow.com/a/40857703/4288201
     def flatten(l):
         for el in l:
-            if isinstance(el, collections.Iterable) and not isinstance(el, basestring):
+            if isinstance(el, collections.Iterable) and not isinstance(el, str):
                 for sub in flatten(el):
                     yield sub
             else:
@@ -442,7 +443,7 @@ def assert_missing_dates(dates, timescale='months', quantity=1):
     """
     current_date = dates[0]
     enddate = dates[-1]
-    if timescale is 'months':
+    if timescale == 'months':
         while current_date <= enddate:
             assert current_date in dates, "{0} is missing in the dataset".format(current_date)
             current_date = current_date + relativedelta(months=quantity)
@@ -810,7 +811,7 @@ def xdaily_to_monthly(files, dates, out_path, name_out):
         # Loop over relevant dates
         for date1, date2 in date_couples[relevant]:
 
-            print date1, date2
+            print(date1, date2)
 
             # Open relevant maps
             xdaily1 = open_as_array(files[dates == date1][0])
@@ -819,7 +820,7 @@ def xdaily_to_monthly(files, dates, out_path, name_out):
             # Correct dateranges at month edges
             if np.any([date1.month != month, date1.year != yyyy]):
 
-                date1 = datetime.date(yyyy, month, 01)
+                date1 = datetime.date(yyyy, month, 1)
 
             if np.any([date2.month != month, date2.year != yyyy]):
 
@@ -831,8 +832,8 @@ def xdaily_to_monthly(files, dates, out_path, name_out):
             # Add values to map
             monthly += np.sum([xdaily1, xdaily2], axis=0) * 0.5 * relevant_days
 
-            print date1, date2
-            print relevant_days
+            print(date1, date2)
+            print(relevant_days)
 
         # Calculate monthly average
         monthly /= days_in_month
@@ -843,7 +844,7 @@ def xdaily_to_monthly(files, dates, out_path, name_out):
         # Save array as geotif
         create_geotiff(out_fih, monthly, *geo_info, compress="LZW")
 
-        print "{0} {1} Created".format(yyyy, month)
+        print("{0} {1} Created".format(yyyy, month))
 
 
 def convert_to_tif(z, lat, lon, output_fh, gdal_grid_path=r'C:\Program Files\QGIS 2.18\bin\gdal_grid.exe'):
@@ -912,7 +913,7 @@ def convert_to_tif(z, lat, lon, output_fh, gdal_grid_path=r'C:\Program Files\QGI
 
     proc = subprocess.Popen(' '.join(string), stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     out, err = proc.communicate()
-    print out, err
+    print(out, err)
 
     os.remove(csv_path)
     os.remove(vrt_path)
