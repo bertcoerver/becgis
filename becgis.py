@@ -10,7 +10,7 @@ import calendar
 import collections
 import subprocess
 import csv
-import LatLon
+from geopy import distance
 from osgeo import gdal, osr
 from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
@@ -750,11 +750,14 @@ def map_pixel_area_km(fih, approximate_lengths=False):
     xsize, ysize, geot = get_geoinfo(fih)[2:-1]
     area_column = np.zeros((ysize, 1))
     for y_pixel in range(ysize):
-        pnt1 = LatLon.LatLon(geot[3] + y_pixel * geot[5], geot[0])
-        pnt2 = LatLon.LatLon(float(str(pnt1.lat)), float(str(pnt1.lon)) + geot[1])
-        pnt3 = LatLon.LatLon(float(str(pnt1.lat)) - geot[1], float(str(pnt1.lon)))
-        pnt4 = LatLon.LatLon(float(str(pnt1.lat)) - geot[1], float(str(pnt1.lon)) + geot[1])
-        area_column[y_pixel, 0] = (pnt1.distance(pnt2) + pnt3.distance(pnt4)) / 2 * pnt1.distance(pnt3)
+        pnt1 = (geot[3] + y_pixel*geot[5], geot[0])
+        pnt2 = (pnt1[0], pnt1[1] + geot[1])
+        pnt3 = (pnt1[0] - geot[1],  pnt1[1])
+        pnt4 = (pnt1[0] - geot[1], pnt1[1] + geot[1])
+        u = distance.distance(pnt1, pnt2).km
+        l = distance.distance(pnt3, pnt4).km
+        h = distance.distance(pnt1, pnt3).km
+        area_column[y_pixel, 0] = (u+l)/2*h
     map_area = np.repeat(area_column, xsize, axis=1)
     if approximate_lengths:
         pixel_approximation = np.sqrt(abs(geot[1]) * abs(geot[5]))
